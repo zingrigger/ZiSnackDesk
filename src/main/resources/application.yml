@@ -1,0 +1,45 @@
+spring:
+  application:
+    name: BOSYON-ZiSnackDesk
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      password: ${REDIS_PWD}
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          max-wait: 1000ms
+          min-idle: 0
+        shutdown-timeout: 100ms
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: ${PG_URL}
+    username: ${PG_USER}
+    password: ${PG_PWD}
+    type: com.alibaba.druid.pool.DruidDataSource
+#    hikari:
+#      pool-name: DatebookHikariCP
+#      minimum-idle: 20
+#      maximum-pool-size: 50
+#      auto-commit: true
+#      idle-timeout: 20000
+#      max-lifetime: 30000
+#      connection-timeout: 120000
+
+
+logging:
+  structured:
+    format:
+      # console: ecs # ????? ECS ??
+      file: logstash # ???? Logstash ??
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB      # ???????? 10MB[reference:8]
+      max-history: 30          # ?? 30 ?????[reference:9]
+      total-size-cap: 2GB      # ?????????? 2GB[reference:10]
+      clean-history-on-start: true # ?????????[reference:11]
+
+server:
+  port: 5000
