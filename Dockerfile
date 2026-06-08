@@ -1,27 +1,39 @@
-# 第二阶段：运行（使用完整的JDK 21基础镜像）
-FROM eclipse-temurin:21-jdk
+# -------------------------
+# Build stage: build the application with Maven
+# -------------------------
+FROM maven:3.9.6-eclipse-temurin-21 AS build
+WORKDIR /workspace
+COPY pom.xml .
+RUN mvn -B dependency:go-offline
+COPY src ./src
+RUN mvn -B -DskipTests package
 
-# 设置工作目录
-WORKDIR /app
+# -------------------------
+# Runtime stage: minimal, secure image
+# - GC logs -> stdout so `docker logs` captures them
+# - Heap dumps -> written to /app/dumps (mount this directory on the host)
+# -------------------------
+FROM eclipse-temurin:21-jdk AS runtime
+LABEL org.opencontainers.image.source="https://example.com/your/repo"
 
-# 创建日志和dump文件存放目录
-RUN mkdir -p /app/logs
+ENV APP_HOME=/app
+ENV DUMP_DIR=/app/dumps
+# Default JVM options. Override at runtime with `-e JAVA_OPTS="..."` if needed.
+ENV JAVA_OPTS="-Xms256m -Xmx512m -XX:+UseG1GC -Xlog:gc*:stdout:time,uptime -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=${DUMP_DIR}"
 
-# 从构建阶段复制jar包（如果你跳过第一阶段，直接COPY target/*.jar app.jar）
-COPY --from=build /app/target/*.jar app.jar
+WORKDIR ${APP_HOME}
+RUN mkdir -p ${APP_HOME} ${DUMP_DIR} \
+    && chown -R 1000:1000 ${APP_HOME} ${DUMP_DIR} || true
 
-# 设置JDK内部的环境变量，确保JVM感知容器内存限制
-# 这是一个“防御性”设置，但在使用完整JDK时通常不是必须的，但保留无害
-ENV JAVA_OPTS="\
-    -Xms256m \
-    -Xmx256m \
-    -XX:+UseG1GC \
-    -Xlog:gc*:file=/app/logs/gc.log:time,uptime:filecount=5,filesize=10M \
-    -XX:+HeapDumpOnOutOfMemoryError \
-    -XX:HeapDumpPath=/app/logs/dump.hprof"
+COPY --from=build /workspace/target/*.jar app.jar
 
-# 暴露应用端口（根据实际情况修改）
-EXPOSE 8080
+# Run as unprivileged numeric user (1000) — avoids running as root.
+USER 1000
 
-# 启动应用
+# Application port (matches `server.port` in application.yml)
+EXPOSE 5000
+
+# Persist heap dumps: recommend mounting a host directory here when running.
+VOLUME ["${DUMP_DIR}"]
+
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]
