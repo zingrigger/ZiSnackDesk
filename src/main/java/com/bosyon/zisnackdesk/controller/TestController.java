@@ -1,7 +1,7 @@
 package com.bosyon.zisnackdesk.controller;
 
 import com.bosyon.zisnackdesk.mapper.SysUserMapper;
-import com.bosyon.zisnackdesk.model.SysUser;
+import com.bosyon.zisnackdesk.user.infrastructure.po.SysUserPO;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.catalina.User;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,7 +43,7 @@ public class TestController {
     @GetMapping("/testSelect")
     public void testSelect() {
         log.info("----- selectAll method test ------");
-        List<SysUser> userList = sysUserMapper.selectList(null);
+        List<SysUserPO> userList = sysUserMapper.selectList(null);
         userList.forEach(System.out::println);
     }
 

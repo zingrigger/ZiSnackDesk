@@ -1,4 +1,4 @@
-package com.bosyon.zisnackdesk.model;
+package com.bosyon.zisnackdesk.user.infrastructure.po;
 
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -10,8 +10,7 @@ import java.time.LocalDateTime;
 
 @Data
 @TableName("sys_user")
-public class SysUser {
-
+public class SysUserPO {
     @Id
     private String id;
 
@@ -23,11 +22,11 @@ public class SysUser {
 
     private String password;
 
-    private String userType = "member";
+    private String userType;
 
-    private Boolean mobileVerified = false;
+    private Boolean mobileVerified;
 
-    private Boolean emailVerified = false;
+    private Boolean emailVerified;
 
     private LocalDateTime deletedAt;
 
@@ -40,5 +39,4 @@ public class SysUser {
 
     @LastModifiedDate
     private LocalDateTime updatedAt;
-
 }
