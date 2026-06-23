@@ -6,42 +6,20 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class TestVT {
 
 
     public static void main(String[] args) {
-        // IO 密集型（默认）
-        for (int i = 0; i < 100; i++) {
-            Thread.startVirtualThread(() -> {
-                // 模拟 I/O
-                try {
-                    Thread.sleep(10);
-                } catch (InterruptedException ignored) {
-                }
-                // 少量计算
-                int x = 0;
-                for (int j = 0; j < 1000; j++) x += j;
-            });
-        }
-
-        // CPU 密集型（显式标记）
-        for (int i = 0; i < 100; i++) {
-            Thread vt = Thread.startVirtualThread(() -> {
-                // 纯计算
-                long sum = 0;
-                for (long j = 0; j < 10_000_000; j++) sum += j;
-            });
-//            vt.setSchedulerHint(Thread.VirtualThreadSchedulerHint.CPU_BOUNDED);
-        }
-
-
+        // others
     }
 
-    public void l3_1() {
+    public static void l3_1() {
         Thread vt = Thread.ofVirtual()
                 .name("my-vt-1")
                 .uncaughtExceptionHandler((t, e) -> System.err.println("Error in " + t + ": " + e))
@@ -67,7 +45,7 @@ public class TestVT {
         }
     }
 
-    public void l3_2() {
+    public static void l3_2() {
         // 1. startVirtualThread
         for (int i = 0; i < 10; i++) {
             Thread.startVirtualThread(() ->
@@ -105,6 +83,78 @@ public class TestVT {
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public static void l3_3(){
+        System.out.println("--- JDK 25 虚拟线程实践开始 ---");
+
+        // 使用 CountDownLatch 确保所有异步任务执行完毕后再结束主线程
+        CountDownLatch ioLatch = new CountDownLatch(100);
+        CountDownLatch cpuLatch = new CountDownLatch(100);
+
+        AtomicInteger ioCounter = new AtomicInteger(0);
+        AtomicInteger cpuCounter = new AtomicInteger(0);
+
+        long startTime = System.currentTimeMillis();
+
+        // 1. IO 密集型任务（虚拟线程的最佳战场）
+        for (int i = 0; i < 100; i++) {
+            final int taskId = i;
+            Thread.startVirtualThread(() -> {
+                try {
+                    // 模拟 I/O 阻塞（此时虚拟线程会释放底层的平台线程）
+                    Thread.sleep(10);
+
+                    // 少量计算
+                    int x = 0;
+                    for (int j = 0; j < 1000; j++) {
+                        x += j;
+                    }
+
+                    ioCounter.incrementAndGet();
+                    System.out.printf("[IO任务-%d] 完成，临时计算结果: %d\n", taskId, x);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } finally {
+                    ioLatch.countDown();
+                }
+            });
+        }
+
+        // 2. CPU 密集型任务
+        // 注意：JDK 没有 setSchedulerHint。CPU密集型任务在虚拟线程中运行，会长时间“钉住”(Pin)平台线程。
+        for (int i = 0; i < 100; i++) {
+            final int taskId = i;
+            Thread.startVirtualThread(() -> {
+                try {
+                    // 纯计算
+                    long sum = 0;
+                    for (long j = 0; j < 10_000_000; j++) {
+                        sum += j;
+                    }
+
+                    cpuCounter.incrementAndGet();
+                    System.out.printf("[CPU任务-%d] 完成，大量计算结果: %d\n", taskId, sum);
+                } finally {
+                    cpuLatch.countDown();
+                }
+            });
+        }
+
+        // 等待所有任务完成
+        try {
+            ioLatch.await();
+            cpuLatch.await();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        long endTime = System.currentTimeMillis();
+
+        System.out.println("--- 实践结果汇报 ---");
+        System.out.println("成功执行的 IO 任务数: " + ioCounter.get());
+        System.out.println("成功执行的 CPU 任务数: " + cpuCounter.get());
+        System.out.println("总耗时: " + (endTime - startTime) + " 毫秒");
     }
 
     public void l2() {
