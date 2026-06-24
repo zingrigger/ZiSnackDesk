@@ -6,7 +6,6 @@ import java.util.concurrent.locks.ReentrantLock;
  * 设计一个经典的账户转账死锁场景：
  * 两个账户 A 和 B，线程 1 从 A 转给 B，线程 2 从 B 转给 A，两者加锁顺序相反。
  * 分别在平台线程和虚拟线程下运行，观察死锁行为，并使用 jcmd 分析线程状态
- *
  * jcmd 找到对应 pid
  * 然后导出对应日志
  * jcmd pid Thread.dump_to_file -l deadlockdemo.txt
@@ -18,7 +17,9 @@ public class DeadlockDemo {
         private final ReentrantLock lock = new ReentrantLock();
         private int balance = 1000;
 
-        Account(String name) { this.name = name; }
+        Account(String name) {
+            this.name = name;
+        }
 
         void transfer(Account to, int amount) {
             System.out.println(Thread.currentThread() + " 尝试获取锁: " + this.name);
@@ -27,12 +28,16 @@ public class DeadlockDemo {
                 System.out.println(Thread.currentThread() + " 成功锁定: " + this.name + "，准备获取: " + to.name);
 
                 // 【核心改进】故意睡 50ms，强制让另一个线程把另一把锁拿走，制造死锁
-                try { Thread.sleep(50); } catch (InterruptedException ignored) {}
+                try {
+                    Thread.sleep(50);
+                } catch (InterruptedException ignored) {
+                }
 
                 to.lock.lock();
                 try {
                     this.balance -= amount;
                     to.balance += amount;
+                    System.out.println(this.balance, to.balance);
                 } finally {
                     to.lock.unlock();
                 }
